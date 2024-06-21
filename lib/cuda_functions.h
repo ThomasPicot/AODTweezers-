@@ -15,6 +15,8 @@
 #include <cstdlib>
 #include <cstring>
 #include <fstream> 
+#include <iostream>
+#include <vector>
 #define _USE_MATH_DEFINES // for M_PI
 
 extern drv_handle hCard;
@@ -70,5 +72,5 @@ extern int * dynamic_list_cuda;
 extern int * static_list_cuda;
 extern int dynamic_loopcount;
 extern bool not_arrived;
-
+void saveDataToFile();
 #endif

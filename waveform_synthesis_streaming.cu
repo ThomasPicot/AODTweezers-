@@ -23,8 +23,8 @@ void *DMABuffer = NULL;
 int block_size;
 // settings for the FIFO mode buffer handling
 uint32 lNotifySize = MEGA_B(2); // The size of data the card will execute each time before signaling to the GPU
-uint32 lBufferSize = MEGA_B(32);
-uint64 HBufferSize = MEGA_B(32); // The actual buffer used on the AWG; must be a power of 2 and should be no more than 4 GB (lower size reduces delay)
+uint32 lBufferSize = MEGA_B(16);
+uint64 HBufferSize = MEGA_B(16); // The actual buffer used on the AWG; must be a power of 2 and should be no more than 4 GB (lower size reduces delay)
 
 // Parameter settings
 int32 lMaxOutputLevel = 1000; // +-1 Volt
@@ -58,7 +58,7 @@ __global__ void FinalWaveGeneration(double *startFreq, double *dest_frequency, i
         {
             int tone_index = j + dynamic_tone_count_cuda[buffer_index];
             double phi = (2.0 * dest_frequency[tone_index] * (dynamic_loopcount_cuda * static_bufferlength_cuda - dynamic_bufferlength_cuda) + (startFreq[dy_list[tone_index]] + dest_frequency[tone_index]) * dynamic_bufferlength_cuda) / llSamplerate_cuda + 2. / static_num_cuda[buffer_index] * dy_list[tone_index] * dy_list[tone_index];
-            pnOut[tone_index * static_bufferlength_cuda + i] = static_cast<short>(32767. * sinpi(2.0 * dest_frequency[tone_index] * i / llSamplerate_cuda + phi) / static_num_cuda[buffer_index]);
+            pnOut[tone_index * static_bufferlength_cuda + i] = static_cast<short>(32767./4 * sinpi(2.0 * dest_frequency[tone_index] * i / llSamplerate_cuda + phi) / static_num_cuda[buffer_index]);
         }
     }
 }
@@ -242,6 +242,7 @@ void cuda_cleanup()
     cudaDeviceSynchronize();
 }
 
+
 /*
 ****************************************************************************************************************************************************************************
 main
@@ -267,7 +268,7 @@ int main()
     spcm_dwSetParam_i32(hCard, SPC_CHENABLE, (0x1 << lNumCh) - 1); // enable all channels
     // spcm_dwSetParam_i32 (hCard, SPC_CARDMODE,       SPC_REP_FIFO_GATE);     // gated FIFO mode
     spcm_dwSetParam_i32(hCard, SPC_CARDMODE, SPC_REP_FIFO_SINGLE);   // Test purpose
-    spcm_dwSetParam_i32(hCard, SPC_TRIG_ORMASK, SPC_TMASK_SOFTWARE); // TEst purporse
+    spcm_dwSetParam_i32(hCard, SPC_TRIG_EXT0_MODE, SPC_TMASK_SOFTWARE); // TEst purporse
     spcm_dwSetParam_i64(hCard, SPC_LOOPS, 0);                        // forever
     spcm_dwSetParam_i32(hCard, SPC_CLOCKMODE, SPC_CM_INTPLL);        // clock mode internal PLL
     spcm_dwSetParam_i32(hCard, SPC_FILTER0, 0);
@@ -570,6 +571,7 @@ int main()
     // clean up
     printf("\nFinished...\n");
     spcm_vClose(hCard);
+
     cuda_cleanup();
     return EXIT_SUCCESS;
 }

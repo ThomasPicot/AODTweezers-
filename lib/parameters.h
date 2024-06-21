@@ -6,7 +6,6 @@ extern const double ramp_time;
 
 void fill_frequency_arrays();
 void print_static_frequencies();
-
 extern double static_freq[4][4096];
 extern double destination_freq[4][4096];
 extern int dynamic_list[1024];

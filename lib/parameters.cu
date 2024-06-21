@@ -2,7 +2,7 @@
 
 // Parameters of the static tweezers
 const double center_freq = 103000000.0;
-const int N_tweezers_vertical = 71;
+const int N_tweezers_vertical = 4;
 const int N_tweezers_horizontal = 4;
 
 // converting frequency with position
