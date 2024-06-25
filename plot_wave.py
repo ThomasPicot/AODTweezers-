@@ -1,65 +1,100 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-# Paramètres à définir selon vos besoins
-illSamplerate_cuda = 280000000  
-channel_num_cuda = 2        # Exemple de valeur, à remplacer par la vôtre
-static_num_cuda = [100, 200] # Exemple de valeurs, à remplacer par les vôtres
-tone_count_cuda = [0, 0]    # Exemple de valeurs, à remplacer par les vôtres
-istatic_num_cuda = [0.1, 0.2] # Exemple de valeurs, à remplacer par les vôtres
-static_bufferlength_cuda = 1024 # Exemple de valeur, à remplacer par la vôtre
-amplitude_signal = 32767.0/4.0     
+# Paramètres de configuration
+center_freq = 103000000.0
+N_tweezers_vertical = 70
+N_tweezers_horizontal = 4
+AOD_2D_freq_to_position = 5.1
+tweezers_spacing = 1.559
+AOD_spacing = tweezers_spacing / AOD_2D_freq_to_position * 1E6
+llSamplerate = 30000000
+ramp_time = 25  # [ms]
+amplitude_signal = 32767.0 / 4.0
 
-def StaticWaveGeneration_single(frequency, ramp_duration_ms):
-    ramp_duration_samples = (ramp_duration_ms / 1000.0) * illSamplerate_cuda
-    pnOut = np.zeros((len(frequency), static_bufferlength_cuda))
-    sumOut = np.zeros((channel_num_cuda, static_bufferlength_cuda))
+# Initialiser les tableaux de fréquences
+static_freq = np.zeros((2, 4096))
 
-    for i in range(static_bufferlength_cuda):
-        for ch in range(channel_num_cuda):
-            sum_val = 0.0
-            for j in range(static_num_cuda[ch]):
-                index = tone_count_cuda[ch] + j
-                phi = 2.0 * istatic_num_cuda[ch] * j
-                ramp_factor = min(float(i) / ramp_duration_samples, 1.0)
-                ramped_amplitude = amplitude_signal * ramp_factor
+# Remplir les tableaux de fréquences
+def fill_frequency_arrays():
+    for i in range(N_tweezers_horizontal):
+        offset = i - N_tweezers_horizontal / 2
+        static_freq[0][i] = center_freq + offset * AOD_spacing
+    
+    for i in range(N_tweezers_vertical):
+        offset = i - N_tweezers_vertical / 2
+        static_freq[1][i] = center_freq + offset * AOD_spacing
 
-                ampl = ramped_amplitude * np.sin(2.0 * np.pi * frequency[index] * i / illSamplerate_cuda + phi) * istatic_num_cuda[ch]
-                pnOut[index, i] = ampl
-                sum_val += ampl
+fill_frequency_arrays()
 
-            sumOut[ch, i] = sum_val
+# Générer la somme de sinusoïdes avec rampe
+def generate_sum_of_sinusoids_with_ramp(frequencies, ramp_duration_ms, buffer_length, samplerate):
+    t = np.arange(buffer_length) / samplerate
+    signal_sum = np.zeros(buffer_length)
+    
+    ramp_duration_samples = (ramp_duration_ms / 1000.0) * samplerate
+    
+    for freq in frequencies:
+        ramp_factor = np.minimum(t / (ramp_duration_samples / samplerate), 1.0)
+        ramped_amplitude = amplitude_signal * ramp_factor
+        signal = ramped_amplitude * np.sin(2.0 * np.pi * freq * t)
+        signal_sum += signal
 
-    return pnOut, sumOut
+    return t, signal_sum
 
-# Exemple d'utilisation
-frequency = np.random.rand(1000)
-ramp_duration_ms = 25.0
+# Générer la somme de sinusoïdes sans rampe (amplitude constante)
+def generate_sum_of_sinusoids_constant_amplitude(frequencies, buffer_length, samplerate):
+    t = np.arange(buffer_length) / samplerate
+    signal_sum = np.zeros(buffer_length)
+    
+    for freq in frequencies:
+        signal = amplitude_signal * np.sin(2.0 * np.pi * freq * t)
+        signal_sum += signal
 
-pnOut, sumOut = StaticWaveGeneration_single(frequency, ramp_duration_ms)
+    return t, signal_sum
 
-# Tracer le signal généré
-time = np.arange(static_bufferlength_cuda) / illSamplerate_cuda
+# Fonction principale pour générer et tracer les signaux
+def main(use_ramp=True):
+    # Paramètres pour l'appel de la fonction
+    horizontal_freqs = static_freq[0][:N_tweezers_horizontal]
+    vertical_freqs = static_freq[1][:N_tweezers_vertical]
+    frequencies = np.concatenate((horizontal_freqs, vertical_freqs))
+    buffer_length = int(llSamplerate)  # 1 seconde de données à la résolution donnée
 
-plt.figure(1)
+    if use_ramp:
+        ramp_duration_ms = ramp_time * 1000
+        time, signal_sum = generate_sum_of_sinusoids_with_ramp(frequencies, ramp_duration_ms, buffer_length, llSamplerate)
+        title_suffix = "with Ramp"
+    else:
+        time, signal_sum = generate_sum_of_sinusoids_constant_amplitude(frequencies, buffer_length, llSamplerate)
+        title_suffix = "with Constant Amplitude"
+    
+    # Effectuer la FFT
+    signal_fft = np.fft.fft(signal_sum)
+    fft_freq = np.fft.fftfreq(buffer_length, 1 / llSamplerate)
 
-# Tracer pnOut
-plt.subplot(2, 1, 1)
-for index in range(len(frequency)):
-    plt.plot(time, pnOut[index], label=f'Tone {index+1}')
-plt.title('pnOut Signal')
-plt.xlabel('Time (s)')
-plt.ylabel('Amplitude')
-plt.legend()
+    # Tracer le signal généré
+    plt.figure(figsize=(14, 7))
 
-# Tracer sumOut
-plt.subplot(2, 1, 2)
-for ch in range(channel_num_cuda):
-    plt.plot(time, sumOut[ch], label=f'Channel {ch+1}')
-plt.title('sumOut Signal')
-plt.xlabel('Time (s)')
-plt.ylabel('Amplitude')
-plt.legend()
+    plt.subplot(2, 1, 1)
+    plt.plot(time, signal_sum, label=f'Sum of Sinusoids {title_suffix}')  # Affichage de la première portion pour la clarté
+    plt.title(f'Sum of Sinusoids {title_suffix}')
+    plt.xlabel('Time (s)')
+    plt.ylabel('Amplitude')
+    plt.legend()
+    plt.grid(True)
 
-plt.tight_layout()
-plt.show()
+    # Tracer le spectre de fréquences
+    plt.subplot(2, 1, 2)
+    plt.plot(fft_freq[:buffer_length // 2], np.abs(signal_fft)[:buffer_length // 2], label='FFT of Signal')
+    plt.title('Frequency Spectrum')
+    plt.xlabel('Frequency (Hz)')
+    plt.ylabel('Magnitude')
+    plt.legend()
+    plt.grid(True)
+
+    plt.tight_layout()
+    plt.show()
+
+# Exécuter la fonction principale avec ou sans rampe
+main(use_ramp=True)  # Changez à False pour l'amplitude constante
