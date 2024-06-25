@@ -10,13 +10,13 @@ const double AOD_2D_freq_to_position = 5.1;
 const double tweezers_spacing = 1.559;
 double AOD_spacing = tweezers_spacing / AOD_2D_freq_to_position * 1E6;
 
-unsigned int dynamic_num[4] = {0, 0, 0, 0};
-unsigned int static_num[4] = {N_tweezers_horizontal, N_tweezers_vertical, 0, 0};
+unsigned int dynamic_num[2] = {0, 0};
+unsigned int static_num[2] = {N_tweezers_horizontal, N_tweezers_vertical};
 extern const int lThreadsPerBlock = 256;
 extern const unsigned long long llSamplerate = 300000000;
 extern const double ramp_time = 0.1;
-double static_freq[4][4096] = {{}, {}, {}, {}};
-double destination_freq[4][4096] = {{}, {}, {}, {}};
+double static_freq[2][4096] = {{}, {}};
+double destination_freq[2][4096] = {{}, {}};
 unsigned int tone_count[5];
 unsigned int dynamic_tone_count[5];
 

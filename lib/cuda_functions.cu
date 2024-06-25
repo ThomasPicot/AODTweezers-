@@ -66,38 +66,37 @@ __global__ void StaticWaveGeneration(double *__restrict__ frequency, double *pnO
     }
 }
 
-__global__ void StaticWaveGeneration_single(double* __restrict__ frequency, double* pnOut, short** sumOut, float ramp_duration_ms)
+__global__ void StaticWaveGeneration_single(double *__restrict__ frequency, double *pnOut, short **sumOut, int trigTime)
 {
     size_t i = blockDim.x * blockIdx.x + threadIdx.x;
-    const float ramp_duration_samples = (25 / 1000.0) *illSamplerate_cuda; // Conversion de la durée de rampe en échantillons
-    float ramp_factor = fminf(static_cast<float>(i) / ramp_duration_samples, 1.0f); // Facteur de la rampe entre 0 et 1
-
     for (int ch = 0; ch < channel_num_cuda; ch++)
     {
-        float sum = 0.0f;
+        double sum = 0.;
         for (size_t j = 0; j < static_num_cuda[ch]; j++)
         {
             int index = tone_count_cuda[ch] + j;
-            float phi = __fmul_rn(__fmul_rn(2.0f, istatic_num_cuda[ch]), static_cast<float>(j * j));
+            double phi = __dmul_rn(__dmul_rn(2., istatic_num_cuda[ch]), static_cast<double>(j * j));
 
-            // Calcul de l'amplitude avec la rampe
-            float ramped_amplitude = amplitude_signal * ramp_factor;
+            // Calcul de l'amplitude avec rampe linéaire au moment du trig
+            double ramp_amplitude = amplitude_signal * static_cast<double>(i - trigTime) / static_bufferlength_cuda;
+            if (i < trigTime) ramp_amplitude = 0.0; // Rampe nulle avant le trig
 
-            // Calcul de l'amplitude finale pour ce point dans le temps
-            float ampl = __fmul_rn(__fmul_rn(ramped_amplitude, __sinf(__fmaf_rn(__fmul_rn(__fmul_rn(2.0f, M_PIf32), frequency[index]), __fmul_rn(static_cast<float>(i), illSamplerate_cuda), phi))), istatic_num_cuda[ch]);
+            // Amplitude de la sinusoïde multipliée par la rampe linéaire
+            double ampl = __dmul_rn(__dmul_rn(ramp_amplitude, sinpi(__fma_rn(__dmul_rn(2.0, frequency[index]), __dmul_rn(static_cast<double>(i), illSamplerate_cuda), phi))), istatic_num_cuda[ch]);
 
-            // Stockage de l'amplitude dans pnOut (peut-être ajusté si nécessaire)
-            pnOut[index * static_bufferlength_cuda + i] = static_cast<double>(ampl);
+            // Stockage de l'amplitude dans pnOut
+            pnOut[index * static_bufferlength_cuda + i] = ampl;
 
-            // Accumulation pour la somme locale
+            // Calcul de la somme pour chaque canal
             sum += ampl;
-            printf("%d", sum);
         }
-
-        // Stockage de la somme dans sumOut pour ce canal et cet indice
+        
+        // Stockage de la somme dans sumOut
         sumOut[ch][i] = static_cast<short>(sum);
     }
 }
+
+
 
 
 // __global__ void StaticCombine(double*__restrict__ buffer,short**sum_buf){
