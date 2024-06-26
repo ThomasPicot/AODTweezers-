@@ -3,13 +3,13 @@ import matplotlib.pyplot as plt
 
 # Paramètres de configuration
 center_freq = 103000000.0
-N_tweezers_vertical = 70
-N_tweezers_horizontal = 4
+N_tweezers_vertical = 2
+N_tweezers_horizontal = 2
 AOD_2D_freq_to_position = 5.1
 tweezers_spacing = 1.559
 AOD_spacing = tweezers_spacing / AOD_2D_freq_to_position * 1E6
 llSamplerate = 30000000
-ramp_time = 25  # [ms]
+ramp_time = 50  # [ms]
 amplitude_signal = 32767.0 / 4.0
 
 # Initialiser les tableaux de fréquences
@@ -32,7 +32,7 @@ def generate_sum_of_sinusoids_with_ramp(frequencies, ramp_duration_ms, buffer_le
     t = np.arange(buffer_length) / samplerate
     signal_sum = np.zeros(buffer_length)
     
-    ramp_duration_samples = (ramp_duration_ms / 1000.0) * samplerate
+    ramp_duration_samples = int((ramp_duration_ms / 1000.0) * samplerate)
     
     for freq in frequencies:
         ramp_factor = np.minimum(t / (ramp_duration_samples / samplerate), 1.0)
@@ -62,7 +62,7 @@ def main(use_ramp=True):
     buffer_length = int(llSamplerate)  # 1 seconde de données à la résolution donnée
 
     if use_ramp:
-        ramp_duration_ms = ramp_time * 1000
+        ramp_duration_ms = ramp_time
         time, signal_sum = generate_sum_of_sinusoids_with_ramp(frequencies, ramp_duration_ms, buffer_length, llSamplerate)
         title_suffix = "with Ramp"
     else:
@@ -74,10 +74,9 @@ def main(use_ramp=True):
     fft_freq = np.fft.fftfreq(buffer_length, 1 / llSamplerate)
 
     # Tracer le signal généré
-    plt.figure(figsize=(14, 7))
+    plt.figure(1)
 
-    plt.subplot(2, 1, 1)
-    plt.plot(time, signal_sum, label=f'Sum of Sinusoids {title_suffix}')  # Affichage de la première portion pour la clarté
+    plt.plot(time[:2000000], signal_sum[:2000000], label=f'Sum of Sinusoids {title_suffix}')  # Affichage de la première portion pour la clarté
     plt.title(f'Sum of Sinusoids {title_suffix}')
     plt.xlabel('Time (s)')
     plt.ylabel('Amplitude')
@@ -85,7 +84,7 @@ def main(use_ramp=True):
     plt.grid(True)
 
     # Tracer le spectre de fréquences
-    plt.subplot(2, 1, 2)
+    plt.figure(2)
     plt.plot(fft_freq[:buffer_length // 2], np.abs(signal_fft)[:buffer_length // 2], label='FFT of Signal')
     plt.title('Frequency Spectrum')
     plt.xlabel('Frequency (Hz)')
